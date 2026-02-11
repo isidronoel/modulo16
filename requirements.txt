@@ -1,0 +1,9 @@
+streamlit
+pandas
+plotly
+openai
+langchain
+langchain-openai
+langchain-community
+faiss-cpu
+pypdf
