@@ -742,10 +742,10 @@ def page_documentation():
         """)
     
     with tab3:
-        with tab2:
+        
         st.markdown("""
         
-       ## Informacion del Equipo
+        ## Informacion del Equipo
         
         ###Nombre del Equipo**: Equipo 7
         
