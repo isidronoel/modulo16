@@ -138,12 +138,19 @@ def initialize_session_state():
     if 'feedback_db' not in st.session_state:
         st.session_state.feedback_db = []
     
-    # User preferences
+    # User preferences - AQUÍ ACTUALIZAMOS EL PROMPT PARA RAG
     if 'preferences' not in st.session_state:
         st.session_state.preferences = {
             'temperature': 0.7,
             'max_tokens': 500,
-            'system_prompt': 'You are a helpful AI assistant.'
+            # NUEVO PROMPT RESTRINGIDO:
+            'system_prompt': (
+                "Eres un asistente académico especializado del Equipo 7. "
+                "Tu objetivo es responder preguntas utilizando EXCLUSIVAMENTE el contexto "
+                "de los documentos PDF proporcionados. Si la información no está en el "
+                "contexto, debes decir: 'Lo siento, esa información no se encuentra en "
+                "los documentos cargados'. No utilices conocimientos externos."
+            )
         }
     
     # Current explanation
@@ -157,16 +164,14 @@ def initialize_session_state():
             'avg_response_time': 0,
             'total_feedback': 0
         }
-#******************************************************************************************
+        
+    # Variables de RAG (Módulo 16)
     if 'vector_db' not in st.session_state:
         st.session_state.vector_db = None
     if 'processed_files' not in st.session_state:
         st.session_state.processed_files = []
     if 'rag_metrics' not in st.session_state:
         st.session_state.rag_metrics = {'total_chunks': 0, 'last_upload': None}
-#**********************************************************************************************
-
-
 # ============================================================================
 # HELPER FUNCTIONS
 # ============================================================================
@@ -177,14 +182,35 @@ def generate_response(message: str, temperature: float = 0.7) -> tuple:
     """
     start_time = time.time()
     
-    # 1. Cargamos el cliente real configurado anteriormente
+   
     client = load_llm()
     
-    # 2. Preparamos el historial para OpenAI
-    messages = [{"role": "system", "content": st.session_state.preferences['system_prompt']}]
-    for msg in st.session_state.messages:
-        messages.append({"role": msg["role"], "content": msg["content"]})
-    messages.append({"role": "user", "content": message})
+    # Validamos si existe la base de datos de documentos
+    if st.session_state.vector_db is not None:
+        # Recuperamos los 3 fragmentos más parecidos
+        docs = st.session_state.vector_db.similarity_search(message, k=3)
+        contexto_pdf = "\n".join([d.page_content for d in docs])
+        
+        # JUNTAMOS EL CONTEXTO CON LA PREGUNTA
+        prompt_con_contexto = f"""
+        CONTEXTO DEL DOCUMENTO:
+        {contexto_pdf}
+        
+        PREGUNTA DEL USUARIO:
+        {message}
+        """
+        system_content = st.session_state.preferences['system_prompt']
+        user_content = prompt_con_contexto
+    else:
+        # Si no hay PDF, avisar que no hay documentos
+        system_content = st.session_state.preferences['system_prompt']
+        user_content = f"AVISO: No hay documentos cargados. Pregunta: {message}"
+
+    # Llamada a la API
+    messages = [
+        {"role": "system", "content": system_content},
+        {"role": "user", "content": user_content}
+    ]
     
     # 3. Llamada correcta a la API
     try:
@@ -742,7 +768,6 @@ def page_documentation():
         """)
     
     with tab3:
-        
         st.markdown("""
         
         ## Informacion del Equipo
